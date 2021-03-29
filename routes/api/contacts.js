@@ -53,12 +53,13 @@ router.get('/:contactId', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { name, email, phone } = req.body
-
+    const reqFields = ['name', 'email', 'phone']
     if (!name || !email || !phone) {
+      const errorMsg = reqFields.filter(item => !Object.keys(req.body).includes(item))
       return res.status(400).json({
         status: 'error',
         code: 400,
-        data: { message: 'missing required name field' },
+        data: { message: `missing required ${errorMsg} field` },
       })
     } else {
       const contact = await addContact(req.body)
