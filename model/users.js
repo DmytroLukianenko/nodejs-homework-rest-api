@@ -6,7 +6,7 @@ const findUserByEmail = async (email) => {
 }
 
 const findUserById = async (id) => {
-    const user = User.findById({ id })
+    const user = User.findById({ _id: id })
     return user
 }
 
