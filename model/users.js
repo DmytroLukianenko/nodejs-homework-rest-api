@@ -24,9 +24,12 @@ const modifySubscription = async (id, subscription) => {
   return user
 }
 
-const updateAvatar = async (id, avatar) => {
-  const user = await User.findByIdAndUpdate(id, { avatarURL: avatar }, { new: true })
-  return user
+// const updateAvatar = async (id, avatar) => {
+//   const user = await User.findByIdAndUpdate(id, { avatarURL: avatar }, { new: true })
+//   return user
+// }
+const updateAvatar = async (id, url) => {
+  return await User.updateOne({ _id: id }, { avatarURL: url })
 }
 
 module.exports = {

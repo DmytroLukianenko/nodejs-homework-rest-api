@@ -1,12 +1,10 @@
 const path = require('path')
 const multer = require('multer')
-const dotenv = require('dotenv').config()
 
-const { TEMPDIR } = process.env
-const tempDirectory = path.join(process.cwd(), TEMPDIR)
+const uploadDirect = path.join(process.cwd(), 'temp')
 const uploadOptions = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, tempDirectory)
+    cb(null, uploadDirect)
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname)

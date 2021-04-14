@@ -1,7 +1,7 @@
 const mongoose = require('mongoose')
 const bCrypt = require('bcryptjs')
 const { Schema, model } = mongoose
-// const gravatar = require('gravatar')
+const gravatar = require('gravatar')
 const SALT_FACTOR = 10
 const userSchema = new Schema({
   email: {
@@ -25,7 +25,18 @@ const userSchema = new Schema({
     default: 'starter',
   },
   token: String,
-  avatarURL: String,
+  // avatarURL: String,
+  avatarURL: {
+    type: String,
+    default: function () {
+      return gravatar.url(
+        this.email,
+        { protocol: 'https' },
+        { s: '250' },
+        true
+      )
+    },
+  },
 })
 
 userSchema.pre('save', async function (next) {

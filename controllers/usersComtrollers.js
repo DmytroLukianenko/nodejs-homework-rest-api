@@ -11,6 +11,13 @@ const {
   updateToken,
   updateAvatar,
 } = require('../model/users')
+///////////////////////////////////////////
+const {
+  downloadAvatarFromUrl,
+  saveAvatarToStatic,
+  deletePreviousAvatar,
+} = require('../utils/create-avatar')
+//////////////////////////////////////////
 const createFolderIsNotExist = require('../helpers/creat-folder')
 
 const { SUPER_SECRET_KEY, UPLOADDIR } = process.env
@@ -28,8 +35,14 @@ const registration = async (req, res, next) => {
         data: 'Email conflict',
       })
     }
-    const avatarURL = gravatar.url(email, { protocol: 'https', s: '250' })
-    const newUser = await createNewUser({ ...req.body, avatarURL })
+    // const avatarURL = gravatar.url(email, { protocol: 'https', s: '250' })
+    // const newUser = await createNewUser({ ...req.body, avatarURL })
+    const newUser = await createNewUser(req.body)
+
+    const { tmpPath, nameAvatar } = await downloadAvatarFromUrl(newUser)
+
+    const avatarURL = await saveAvatarToStatic(newUser.id, tmpPath, nameAvatar)
+    await updateAvatar(newUser.id, avatarURL)
 
     res.status(201).json({
       status: 'success',
@@ -38,6 +51,7 @@ const registration = async (req, res, next) => {
         user: {
           email: newUser.email,
           subscription: newUser.subscription,
+          avatarURL: newUser.avatarURL,
         },
       },
     })
@@ -142,27 +156,26 @@ const patch = async (req, res, next) => {
 }
 
 const avatar = async (req, res, next) => {
-  const { path: tempName, originalname } = req.file
-  const { id } = req.user
-  await createFolderIsNotExist(uploadDirectory)
-  const img = await Jimp.read(tempName)
-  await img
-    .autocrop()
-    .cover(250, 250, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE)
-    .writeAsync(tempName)
-  const newName = path.join(uploadDirectory, `avatar${id}${path.extname(originalname)}`)
   try {
-    await fs.rename(tempName, newName)
-    const user = await updateAvatar(id, newName)
-    res.status(200).json({
+    const id = req.user.id
+
+    const pathFile = req.file.path
+
+    const fileName = `${Date.now()}-${req.file.originalname}`
+
+    const newAvatarUrl = await saveAvatarToStatic(id, pathFile, fileName)
+
+    await updateAvatar(id, newAvatarUrl)
+
+    await deletePreviousAvatar(req.user.avatarURL)
+
+    return res.status(200).json({
       status: 'success',
       code: 200,
-      message: 'avatar link updated',
-      data: { avatarURL: user.avatarURL },
+      data: { newAvatarUrl },
     })
-  } catch (error) {
-    await fs.unlink(tempName)
-    return next(error)
+  } catch (err) {
+    next(err)
   }
 }
 
