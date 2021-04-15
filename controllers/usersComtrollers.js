@@ -10,18 +10,21 @@ const {
   createNewUser,
   updateToken,
   updateAvatar,
+  findByVerifyToken,
+  updateVerifyToken
 } = require('../model/users')
-///////////////////////////////////////////
 const {
   downloadAvatarFromUrl,
   saveAvatarToStatic,
   deletePreviousAvatar,
 } = require('../utils/create-avatar')
-//////////////////////////////////////////
-const createFolderIsNotExist = require('../helpers/creat-folder')
+const { nanoid } = require('nanoid')
+const sendMail = require('../utils/mailSendler')
 
-const { SUPER_SECRET_KEY, UPLOADDIR } = process.env
-const uploadDirectory = path.join(process.cwd(), UPLOADDIR)
+// const createFolderIsNotExist = require('../helpers/creat-folder')
+
+const { SUPER_SECRET_KEY } = process.env
+// const uploadDirectory = path.join(process.cwd(), UPLOADDIR)
 
 const registration = async (req, res, next) => {
   try {
@@ -35,12 +38,11 @@ const registration = async (req, res, next) => {
         data: 'Email conflict',
       })
     }
-    // const avatarURL = gravatar.url(email, { protocol: 'https', s: '250' })
-    // const newUser = await createNewUser({ ...req.body, avatarURL })
-    const newUser = await createNewUser(req.body)
+    const verifyToken = nanoid()
+    const newUser = await createNewUser({ ...req.body, verifyToken })
+    await sendMail(verifyToken, email)
 
     const { tmpPath, nameAvatar } = await downloadAvatarFromUrl(newUser)
-
     const avatarURL = await saveAvatarToStatic(newUser.id, tmpPath, nameAvatar)
     await updateAvatar(newUser.id, avatarURL)
 
@@ -94,6 +96,7 @@ const login = async (req, res, next) => {
     next(err)
   }
 }
+
 const logout = async (req, res, next) => {
   try {
     const id = req.user.id
@@ -129,31 +132,31 @@ const currentUser = async (req, res, next) => {
   }
 }
 
-const patch = async (req, res, next) => {
-  try {
-    const { subscription } = req.body
-    const subOptions = Object.values(Subscription)
-    if (!subOptions.includes(subscription)) {
-      return res.status(400).json({
-        status: 'error',
-        code: 400,
-        message: `invalid subscription, must be one of the following: ${subOptions}`,
-      })
-    }
-    const user = await patchSub(req.user.id, subscription)
-    return res.status(200).json({
-      status: 'success',
-      code: 200,
-      message: `subscription changed to ${subscription}`,
-      data: {
-        email: user.email,
-        subscription: user.subscription,
-      },
-    })
-  } catch (err) {
-    next(err)
-  }
-}
+// const patch = async (req, res, next) => {
+//   try {
+//     const { subscription } = req.body
+//     const subOptions = Object.values(Subscription)
+//     if (!subOptions.includes(subscription)) {
+//       return res.status(400).json({
+//         status: 'error',
+//         code: 400,
+//         message: `invalid subscription, must be one of the following: ${subOptions}`,
+//       })
+//     }
+//     const user = await patchSub(req.user.id, subscription)
+//     return res.status(200).json({
+//       status: 'success',
+//       code: 200,
+//       message: `subscription changed to ${subscription}`,
+//       data: {
+//         email: user.email,
+//         subscription: user.subscription,
+//       },
+//     })
+//   } catch (err) {
+//     next(err)
+//   }
+// }
 
 const avatar = async (req, res, next) => {
   try {
@@ -179,11 +182,69 @@ const avatar = async (req, res, next) => {
   }
 }
 
+const verify = async (req, res, next) => {
+  try {
+    const result = await findByVerifyToken(req.params.verificationToken)
+    await updateVerifyToken(result.id, true, null)
+    if (result) {
+      return res.status(200).json({
+        Status: '200 OK',
+        code: '200',
+        ResponseBody: {
+          message: 'Verification successful',
+        },
+
+      })
+    } else {
+      return next({
+        Status: '404 Not Found',
+        ResponseBody: {
+          message: 'User not found'
+        }
+      })
+    }
+  } catch (error) {
+    next(error)
+  }
+}
+
+const resend = async (req, res, next) => {
+  try {
+    const { email } = req.body
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: 'missing required field email',
+      })
+    }
+    const user = await findUserByEmail(email)
+    if (user.verify) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: 'Verification has already been passed',
+      })
+    }
+    const verifyToken = user.verifyToken
+    await sendMail(verifyToken, email)
+
+    res.status(200).json({
+      status: 'success',
+      code: 200,
+      message: 'Verification email sent',
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 module.exports = {
   registration,
   login,
   currentUser,
-  patch,
   logout,
   avatar,
+  verify,
+  resend
 }
